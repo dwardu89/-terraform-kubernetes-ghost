@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blog
+  labels:
+    app: blog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blog
+  template:
+    metadata:
+      labels:
+        app: blog
+    spec:
+      containers:
+      - name: blog
+        image: ghost:2.6-alpine
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 2368
+        env:
+        - name: url
+        # This will have to be updated to rflect the load balancer.
+          value: "http://a6253be72e3704a7894942dafce3cac1-853915890.eu-west-1.elb.amazonaws.com"
+        - name: GHOST_PORT_NUMBER
+          value: "80"
+        - name: MARIADB_HOST
+          value: mysql
+        - name: MARIADB_PORT_NUMBER
+          value: "3306"
+        - name: GHOST_DATABASE_NAME
+          value: ghost
+        - name: GHOST_DATABASE_USER
+          value: root
+        - name: GHOST_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql
+              key: mysql-password
+        volumeMounts:
+        - mountPath: /var/lib/ghost/content
+          name: content
+
+          
+      volumes:
+      - name: content
+        persistentVolumeClaim:
+          claimName: blog-content
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blog
+spec:
+  type: LoadBalancer
+  selector:
+    app: blog
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 2368
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: blog-content
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
